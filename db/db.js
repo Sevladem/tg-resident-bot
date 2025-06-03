@@ -7,4 +7,7 @@ module.exports = {
   getPermissions: provider.getPermissions,
   listUsers: provider.listUsers,
   searchCarByNumber: provider.searchCarByNumber,
+  addLog: provider.addLog,
+  getPhotoByID: provider.getPhotoByID,
+  addPhoto: provider.addPhoto,
 };

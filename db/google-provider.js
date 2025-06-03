@@ -1,7 +1,9 @@
 const { readSheet } = require('../google/google-read'); 
-const { writeCell } = require('../google/google-write'); 
+const { writeCell, writeRow } = require('../google/google-write'); 
 
 const USERS_SHEET_NAME = 'users';
+const LOG_SHEET_NAME = 'log';
+const PHOTO_SHEET_NAME = 'photo';
 
 async function listUsers() {
   const rows = await readSheet(USERS_SHEET_NAME);
@@ -40,24 +42,28 @@ async function getPermissions(userId) {
   };
 }
 
-// Заглушка - поки повертає всі машини, що містять query в номері (без врахування регістру)
-async function searchCarByNumber(query) {
-  const dataRows = await readSheet('data'); // Всі рядки з основної таблиці
+async function getPhotoByID(id) {
   const photoRows = await readSheet('photo'); // Всі рядки з таблиці фото
 
-  // Побудова мапи фото: { 'НПП': [url1, url2, ...] }
-  const photoMap = {};
+  const urls = [];
+
   for (const row of photoRows) {
     const npp = row[0]?.trim();
     const url = row[1]?.trim();
-    if (!npp || !url) continue;
 
-    if (!photoMap[npp]) {
-      photoMap[npp] = [];
+    if (!npp || !url) continue;
+    if (npp === id) {
+      urls.push(url);
     }
-    photoMap[npp].push(url);
   }
 
+  return urls;
+}
+
+// Заглушка - поки повертає всі машини, що містять query в номері (без врахування регістру)
+async function searchCarByNumber(query) {
+  const dataRows = await readSheet('data'); // Всі рядки з основної таблиці
+  
   // Пошук по номеру авто (6-а колонка, тобто індекс 5)
   const filtered = dataRows.filter(row => {
     const number = row[5]?.toLowerCase().replace(/\s+/g, '');
@@ -67,11 +73,19 @@ async function searchCarByNumber(query) {
   // Додати фото до кожного результату (в 7 колонку)
   for (const row of filtered) {
     const npp = row[0]?.trim();
-    row[6] = photoMap[npp] || [];
+    row[6] = await getPhotoByID(npp);
   }
 
   return filtered;
 
+}
+
+async function addLog(row) {
+  await writeRow(LOG_SHEET_NAME, row);
+}
+
+async function addPhoto(row) {
+  await writeRow(PHOTO_SHEET_NAME, row);
 }
 
 module.exports = {
@@ -81,4 +95,7 @@ module.exports = {
   setTelegramId,
   getPermissions,
   searchCarByNumber,
+  addLog,
+  getPhotoByID,
+  addPhoto,
 };

@@ -1,28 +1,44 @@
-function recordInfo(row) {
-    const number = row[5] || '—';
-    const id = row[1] || '—';
-    const phone1 = row[2]?.trim();
-    const phone2 = row[3]?.trim();
-    const phone3 = row[4]?.trim();
-    const photos = Array.isArray(row[6]) ? row[6] : [];
-  
-    let text = `🚗 Номер авто: ${number}\n🏠 ID: ${id}`;
-  
-    const phoneLines = [];
-    if (phone1) phoneLines.push(`📞 Телефон: ${phone1}`);
-    if (phone2) phoneLines.push(`📞 Телефон: ${phone2}`);
-    if (phone3) phoneLines.push(`📞 Телефон: ${phone3}`);
-  
-    if (phoneLines.length > 0) {
-      text += '\n\n' + phoneLines.join('\n');
-    } else {
-      text += '\n\n❗️ УВАГА. ЗАПИС ЗНАЙДЕНО, АЛЕ НЕМАЄ ТЕЛЕФОНІВ';
-    }
-  
-    return {
-      infoText: text,
-      photoUrls: photos
-    };
+function recordInfo(record, userPermissions) {
+  const [id, userId, phone1, phone2, phone3, carNumber, photoUrlsRaw] = record;
+  const photoUrls = Array.isArray(photoUrlsRaw) ? photoUrlsRaw.filter(Boolean) : [];
+
+  const lines = [];
+  lines.push(`🚗 Номер авто: ${carNumber}`);
+  lines.push(`🏠 ID: ${userId}`);
+
+  const phones = [phone1, phone2, phone3].filter(Boolean);
+  if (phones.length) {
+    phones.forEach(phone => lines.push(`📞 Телефон: ${phone}`));
+  } else {
+    lines.push('❗️ УВАГА. ЗАПИС ЗНАЙДЕНО, АЛЕ НЕМАЄ ТЕЛЕФОНІВ');
   }
-  
-  module.exports = { recordInfo };
+
+  const infoText = lines.join('\n');
+
+  // Формуємо кнопки
+  const extraButtons = [];
+
+  if (userPermissions?.canAddPhoto) {
+    extraButtons.push([{
+      text: '📷 Додати фото',
+      callback_data: `addPhoto_${id}`
+    }]);
+  }
+
+  if (userPermissions?.canAddIncident) {
+    extraButtons.push([{
+      text: '❗️Додати інцидент',
+      callback_data: `addIncident_${id}`
+    }]);
+  }
+
+  return {
+    infoText,
+    photoUrls,
+    extraButtons,
+  };
+}
+
+module.exports = {
+  recordInfo,
+};

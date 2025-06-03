@@ -3,7 +3,6 @@ const { getSheetsClient } = require('./google-auth');
 async function writeCell(sheetName, rowIndex, colIndex, value) {
   const sheets = await getSheetsClient();
 
-  // У Google Sheets індексація з 1 (тобто: A1, B1, C1, ...)
   const columnLetter = String.fromCharCode('A'.charCodeAt(0) + colIndex);
   const cell = `${sheetName}!${columnLetter}${rowIndex + 1}`;
 
@@ -17,6 +16,24 @@ async function writeCell(sheetName, rowIndex, colIndex, value) {
   });
 }
 
+async function writeRow(sheetName, rowData) {
+  const sheets = await getSheetsClient();
+
+  const range = `${sheetName}!A1`;
+
+  await sheets.spreadsheets.values.append({
+    spreadsheetId: process.env.SPREADSHEET_ID,
+    range,
+    valueInputOption: 'RAW',
+    insertDataOption: 'INSERT_ROWS',
+    requestBody: {
+      values: [rowData],
+    },
+  });
+}
+
 module.exports = {
   writeCell,
+  writeRow,
 };
+

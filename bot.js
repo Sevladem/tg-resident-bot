@@ -1,6 +1,9 @@
 require('dotenv').config();
 const TelegramBot = require('node-telegram-bot-api');
 const access = require('./utils/access');
+const { logEvent } = require('./utils/logger');
+const { getUserState, clearUserState } = require('./utils/state');
+addModule = require('./handlers/add');
 
 // Ініціалізуємо бота
 const bot = new TelegramBot(process.env.BOT_TOKEN, { polling: true });
@@ -8,7 +11,7 @@ const bot = new TelegramBot(process.env.BOT_TOKEN, { polling: true });
 // Обробники
 const startHandler = require('./handlers/start');
 searchModule = require('./handlers/search');
-const addHandler = require('./handlers/add');
+addModule = require('./handlers/add'); 
 const editHandler = require('./handlers/edit');
 const deleteHandler = require('./handlers/delete');
 const restartHandler = require('./handlers/restart'); 
@@ -18,8 +21,24 @@ const restartHandler = require('./handlers/restart');
 // ================================
 
 bot.on('message', async (msg) => {
+  const user = msg.from;
+  const userId = user.id;
   const text = msg.text;
-  const userId = msg.from.id;
+  
+  await logEvent({
+    user,
+    action: 'message',
+    query: text,
+    result: '',
+  });
+
+  const state = getUserState(userId);
+
+  if (state) {
+    await addModule.handleUserInput(bot, msg, state);
+    clearUserState(userId);
+    return;
+  }
 
   if (text === '/start' || msg.contact) {
     return startHandler(bot, msg);
@@ -61,11 +80,21 @@ bot.on('message', async (msg) => {
 });
 
 bot.on('callback_query', async (callbackQuery) => {
+  const user = callbackQuery.from;
   const data = callbackQuery.data;
+
+  await logEvent({
+    user,
+    action: 'callback_query',
+    query: data,
+    result: '',
+  });
+
   try {
     if (data.startsWith('car_info_')) {
-      // Перенаправляємо callback до модуля пошуку
       await searchModule.handleCallbackQuery(bot, callbackQuery);
+    } else if (data.startsWith('addPhoto_') || data.startsWith('addIncident_')) {
+        await addModule.handleCallbackQuery(bot, callbackQuery);
     } else if (data.startsWith('otherPrefix_')) {
       // Перенаправляємо callback до іншого модуля
       //await otherModule.handleCallbackQuery(bot, callbackQuery);

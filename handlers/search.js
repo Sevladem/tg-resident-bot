@@ -1,14 +1,27 @@
 const db = require('../db/db');
-const { recordInfo } = require('../utils/format');
+const { getUserPermissions } = require('../utils/access');
+const { sendCarInfo } = require('../utils/sendCarInfo');
 
 const waitingForSearchInput = new Set(); // юзери, що вводять текст пошуку
 const searchCache = new Map(); // chatId -> масив результатів
 
-async function doSearch(bot, chatId, query) {
+async function doSearch(bot, msg ) {
+  const userId = msg.from.id;
+  const chatId = msg.chat.id;
+
+  if (!msg.text || typeof msg.text !== 'string') {
+    await bot.sendMessage(msg.chat.id, 'Підтримується лише текстовий пошук.');
+  return;
+  }
+
+  const query = msg.text.trim();
+
   if (!query) {
     return bot.sendMessage(chatId, 'Порожній запит, спробуйте ще раз.');
   }
 
+  await bot.sendChatAction(chatId, 'typing');
+  //await new Promise(resolve => setTimeout(resolve, 500));
   const results = await db.searchCarByNumber(query);
 
   if (!results.length) {
@@ -17,21 +30,11 @@ async function doSearch(bot, chatId, query) {
 
   searchCache.set(chatId, results);
 
+  const perms = await getUserPermissions(userId);
+
   if (results.length === 1) {
     const row = results[0];
-    const { infoText, photoUrls } = recordInfo(row);
-
-    if (photoUrls.length > 0) {
-        // Всі фото, крім останнього — без підпису
-        for (let i = 0; i < photoUrls.length - 1; i++) {
-          await bot.sendPhoto(chatId, photoUrls[i]);
-        }
-      
-        // Останнє фото — з підписом
-        await bot.sendPhoto(chatId, photoUrls[photoUrls.length - 1], { caption: infoText });
-    } else {
-      return bot.sendMessage(chatId, infoText + '\n\nбез фото');
-    }
+    return sendCarInfo(bot, chatId, row, perms);
   }
 
   // Якщо декілька записів — формуємо кнопки
@@ -48,11 +51,8 @@ async function doSearch(bot, chatId, query) {
 }
 
 async function searchHandler(bot, msg) {
-  const chatId = msg.chat.id;
+  
   const userId = msg.from.id;
-
-  // Якщо це callback_query, Telegram передає окремо, тому тут перевірка не потрібна.
-  // Але якщо треба, можна обробляти callback_query у головному файлі.
 
   if (msg.text === '/search') {
     waitingForSearchInput.add(userId);
@@ -61,52 +61,57 @@ async function searchHandler(bot, msg) {
 
   if (waitingForSearchInput.has(userId)) {
     waitingForSearchInput.delete(userId);
-    const query = msg.text.trim();
-    return doSearch(bot, chatId, query);
   }
 
-  // Пошук одразу по тексту повідомлення
-  const query = msg.text.trim();
-  return doSearch(bot, chatId, query);
+  return doSearch(bot, msg);
 }
 
 // Функція для обробки callback_query, викликається з головного модуля
 async function handleCallbackQuery(bot, callbackQuery) {
   const chatId = callbackQuery.message.chat.id;
-  const messageId = callbackQuery.message.message_id;
+  const userId = callbackQuery.from.id;
   const data = callbackQuery.data;
 
-  if (!data.startsWith('car_info_')) return;
+  if (data.startsWith('car_info_')) {
+    const index = Number(data.split('_')[2]);
+    const results = searchCache.get(chatId);
 
-  const index = Number(data.split('_')[2]);
-  const results = searchCache.get(chatId);
+    if (!results || !results[index]) {
+      await bot.answerCallbackQuery(callbackQuery.id, { text: 'Інформація недоступна або застаріла.' });
+      return;
+    }
 
-  if (!results || !results[index]) {
-    await bot.answerCallbackQuery(callbackQuery.id, { text: 'Інформація недоступна або застаріла.' });
-    return;
+    const row = results[index];
+    const perms = await getUserPermissions(userId);
+    //await bot.deleteMessage(chatId, messageId);
+    await sendCarInfo(bot, chatId, row, perms);
+
+    return bot.answerCallbackQuery(callbackQuery.id);
   }
 
-  const row = results[index];
-  const { infoText, photoUrls } = recordInfo(row);
+  if (data.startsWith('morePhotos_')) {
+    const id = data.split('_')[1];
+    const urls = await db.getPhotoByID(id);
+    if (!urls || urls.length <= 1) {
+      await bot.sendMessage(chatId, 'Більше фото немає.');
+      return;
+    }
 
-  if (photoUrls.length > 0) {
-        await bot.deleteMessage(chatId, messageId);
-        // Всі фото, крім останнього — без підпису
-        for (let i = 0; i < photoUrls.length - 1; i++) {
-          await bot.sendPhoto(chatId, photoUrls[i]);
-        }
-      
-        // Останнє фото — з підписом
-        await bot.sendPhoto(chatId, photoUrls[photoUrls.length - 1], { caption: infoText });
-  } else {
-    await bot.editMessageText(infoText + '\n\nбез фото', {
-      chat_id: chatId,
-      message_id: messageId,
-    });
+    // Всі фото, крім першого
+    const additionalUrls = urls.slice(1);
+
+    // Формуємо масив для надсилання
+    const mediaGroup = additionalUrls.map((url, index) => ({
+      type: 'photo',
+      media: url,
+     ...(index === 0 ? { caption: '📸 Додаткові фото авто' } : {}),
+    }));
+
+    await bot.sendMediaGroup(chatId, mediaGroup);
+
+    return bot.answerCallbackQuery(callbackQuery.id);
   }
 
-  await bot.answerCallbackQuery(callbackQuery.id);
 }
 
 module.exports = { searchHandler, handleCallbackQuery };
-

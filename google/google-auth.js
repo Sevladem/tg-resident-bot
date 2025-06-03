@@ -13,7 +13,7 @@ async function getAuthClient() {
   
   const auth = new google.auth.GoogleAuth({
     credentials: credentials,
-    scopes: ['https://www.googleapis.com/auth/spreadsheets'],
+    scopes: ['https://www.googleapis.com/auth/spreadsheets','https://www.googleapis.com/auth/drive.file'],
   });
 
   authClient = await auth.getClient();
