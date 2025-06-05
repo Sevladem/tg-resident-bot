@@ -1,5 +1,6 @@
 // restart.js
 const access = require('../utils/access');
+const settings = require('../utils/settings');
 
 module.exports = async (bot, msg) => {
   const chatId = msg.chat.id;
@@ -19,5 +20,6 @@ module.exports = async (bot, msg) => {
     });
   }
 
+  settings.reload();
   await bot.sendMessage(chatId, 'Бот перезапущено.');
 };

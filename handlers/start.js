@@ -20,8 +20,8 @@ module.exports = (bot, msg) => {
       await updateCommandsForUser(bot, userId);
       await bot.sendMessage(chatId, 'Вітаємо! Ви авторизовані.');
 
-      const commands = await access.getAvailableCommands(userId);
-      await bot.sendMessage(chatId, `Доступні команди:\n${commands.map(c => '/' + c.command).join('\n')}`);
+      //const commands = await access.getAvailableCommands(userId);
+      //await bot.sendMessage(chatId, `Доступні команди:\n${commands.map(c => '/' + c.command).join('\n')}`);
     } else {
       // Перевірка на вільні записи
       const users = await access.loadUserData(); // тобі треба реалізувати це або викликати з db/google-provider

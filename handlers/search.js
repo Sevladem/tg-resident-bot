@@ -1,11 +1,15 @@
 const db = require('../db/db');
 const { getUserPermissions } = require('../utils/access');
 const { sendCarInfo } = require('../utils/sendCarInfo');
+const { normalizeQuery } = require('../utils/translit');
+const { logEvent } = require('../utils/logger');
+const settings = require('../utils/settings');
 
 const waitingForSearchInput = new Set(); // юзери, що вводять текст пошуку
 const searchCache = new Map(); // chatId -> масив результатів
 
 async function doSearch(bot, msg ) {
+  const user = msg.from;
   const userId = msg.from.id;
   const chatId = msg.chat.id;
 
@@ -14,10 +18,23 @@ async function doSearch(bot, msg ) {
   return;
   }
 
-  const query = msg.text.trim();
+  const original = msg.text.trim();
+  const minLength = parseInt(settings.get('SearchMinLength','3') , 10);
 
-  if (!query) {
-    return bot.sendMessage(chatId, 'Порожній запит, спробуйте ще раз.');
+  if (!original || original.length < minLength) {
+    await bot.sendMessage(chatId, `🔍 Введіть щонайменше ${minLength} символи(ів) для пошуку.`);
+    return;
+  }
+  
+  const query = normalizeQuery(original); // 👈 застосування транслітерації
+
+  if (query !== original) {
+    await logEvent({
+      user,
+      action: 'translit',
+      query: `${original} -> ${query}`, // 👈 ось тут лог
+      result: '',
+    });
   }
 
   await bot.sendChatAction(chatId, 'typing');
@@ -53,7 +70,8 @@ async function doSearch(bot, msg ) {
 async function searchHandler(bot, msg) {
   
   const userId = msg.from.id;
-
+  const chatId = msg.chat.id;
+  
   if (msg.text === '/search') {
     waitingForSearchInput.add(userId);
     return bot.sendMessage(chatId, 'Введіть номер повністю, або частково без пробілів');

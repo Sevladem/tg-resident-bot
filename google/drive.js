@@ -2,7 +2,7 @@ const { google } = require('googleapis');
 const fs = require('fs');
 const path = require('path');
 const { getAuthClient } = require('./google-auth');
-const folderId = process.env.GOOGLE_DRIVE_FOLDER_ID;
+const folderId = process.env.GOOGLE_DRIVE_PHOTO_FOLDER_ID;
 
 
 async function uploadToDrive(filePath, fileName) {

@@ -34,14 +34,16 @@ async function handleCallbackQuery(bot, callbackQuery) {
 
 async function handleUserInput(bot, msg, state) {
   const { action, recordId } = state;
+  const userId = msg.from.id;
 
   if (action === 'addPhoto') {
     const photo = msg.photo?.at(-1); // найкраща якість
+    
     if (!photo) {
       return bot.sendMessage(msg.chat.id, '❗️ Будь ласка, надішліть саме фото.');
     }
 
-    const success = await savePhoto(recordId, photo.file_id, bot);
+    const success = await savePhoto(recordId, photo.file_id, userId, bot);
 
     if (success) {
       await bot.sendMessage(msg.chat.id, '✅ Фото збережено!');
@@ -63,7 +65,7 @@ async function handleUserInput(bot, msg, state) {
 }
 
 
-async function savePhoto(recordId, fileId, bot) {
+async function savePhoto(recordId, fileId, userId, bot) {
   try {
     // 1. Завантажуємо файл з Telegram
     const localPath = await downloadFile(fileId, bot.token);
@@ -73,7 +75,7 @@ async function savePhoto(recordId, fileId, bot) {
     const driveUrl = await uploadToDrive(localPath, fileName);
 
     // 3. Додаємо запис у Google Sheets
-    await db.addPhoto([recordId, driveUrl]);
+    await db.addPhoto([recordId, driveUrl, userId]);
 
     return true;
   } catch (err) {

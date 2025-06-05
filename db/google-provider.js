@@ -85,7 +85,9 @@ async function addLog(row) {
 }
 
 async function addPhoto(row) {
-  await writeRow(PHOTO_SHEET_NAME, row);
+  const timestamp = new Date().toISOString(); // або .toLocaleString() для читабельнішого формату
+  const rowWithTimestamp = [timestamp, ...row];
+  await writeRow(PHOTO_SHEET_NAME, rowWithTimestamp);
 }
 
 module.exports = {
